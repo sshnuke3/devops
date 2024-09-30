@@ -13,55 +13,59 @@ if (!is_dir('tasks')) {
 
 // 处理表单提交
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $task = [
-        'name' => $_POST['name'],
-        'repoUrl' => $_POST['repoUrl'],
-        'branches' => $_POST['branches'],
-        'releaseMode' => $_POST['releaseMode']
-    ];
+    if (isset($_POST['name'], $_POST['repoUrl'], $_POST['branches'], $_POST['done'])) {
+        $taskId = $_POST['name'];
+        $repoUrl = $_POST['repoUrl'];
+        $branches = $_POST['branches'];
 
-    // 读取现有任务列表或初始化为空数组
-    $tasks = file_exists($todoFilePath) ? json_decode(file_get_contents($todoFilePath), true) : [];
+        $tasks = file_exists($todoFilePath) ? json_decode(file_get_contents($todoFilePath), true) : [];
+        $doneTasks = file_exists($doneFilePath) ? json_decode(file_get_contents($doneFilePath), true) : [];
 
-    // 将新任务添加到数组中
-    array_push($tasks, $task);
-
-    // 将更新后的任务列表写回文件
-    file_put_contents($todoFilePath, json_encode($tasks, JSON_PRETTY_PRINT));
-
-    // 提交成功后重定向以避免重复提交
-    header("Location: " . $_SERVER['PHP_SELF']);
-    exit;
-}
-
-// 处理标记为完成的任务
-if ($_GET && isset($_GET['id'])) {
-    $taskId = $_GET['id'];
-
-    $tasks = file_exists($todoFilePath) ? json_decode(file_get_contents($todoFilePath), true) : [];
-    $doneTasks = file_exists($doneFilePath) ? json_decode(file_get_contents($doneFilePath), true) : [];
-
-    // 查找并删除todo list中的任务
-    foreach ($tasks as $key => $task) {
-        if ($task['name'] === $taskId) {
-            // 添加完成时间
-            $task['completedAt'] = date('Y-m-d H:i:s');
-            $doneTasks[] = $task;
-            unset($tasks[$key]);
-            break;
+        // 查找并删除todo list中的任务
+        foreach ($tasks as $key => $task) {
+            if ($task['name'] === $taskId &&
+                $task['repoUrl'] === $repoUrl &&
+                $task['branches'] === $branches) {
+                // 添加完成时间
+                $task['completedAt'] = date('Y-m-d H:i:s');
+                $doneTasks[] = $task;
+                unset($tasks[$key]);
+                break;
+            }
         }
+
+        // 重新索引数组
+        $tasks = array_values($tasks);
+
+        // 写入文件
+        file_put_contents($todoFilePath, json_encode($tasks, JSON_PRETTY_PRINT));
+        file_put_contents($doneFilePath, json_encode($doneTasks, JSON_PRETTY_PRINT));
+
+        // 标记完成成功后重定向
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit;
+    } else {
+        // 处理新任务提交
+        $task = [
+            'name' => $_POST['name'],
+            'repoUrl' => $_POST['repoUrl'],
+            'branches' => $_POST['branches'],
+            'releaseMode' => $_POST['releaseMode']
+        ];
+
+        // 读取现有任务列表或初始化为空数组
+        $tasks = file_exists($todoFilePath) ? json_decode(file_get_contents($todoFilePath), true) : [];
+
+        // 将新任务添加到数组中
+        array_push($tasks, $task);
+
+        // 将更新后的任务列表写回文件
+        file_put_contents($todoFilePath, json_encode($tasks, JSON_PRETTY_PRINT));
+
+        // 提交成功后重定向以避免重复提交
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit;
     }
-
-    // 重新索引数组
-    $tasks = array_values($tasks);
-
-    // 写入文件
-    file_put_contents($todoFilePath, json_encode($tasks, JSON_PRETTY_PRINT));
-    file_put_contents($doneFilePath, json_encode($doneTasks, JSON_PRETTY_PRINT));
-
-    // 标记完成成功后重定向
-    header("Location: " . $_SERVER['PHP_SELF']);
-    exit;
 }
 
 // 主页内容
@@ -185,7 +189,14 @@ if ($_GET && isset($_GET['id'])) {
                 echo "<td>{$task['repoUrl']}</td>";
                 echo "<td>{$task['branches']}</td>";
                 echo "<td>{$task['releaseMode']}</td>";
-                echo "<td><a href='?id={$task['name']}'>Done</a></td>";
+                echo "<td>";
+                echo "<form action='' method='post'>";
+                echo "<input type='hidden' name='name' value='{$task['name']}'>";
+                echo "<input type='hidden' name='repoUrl' value='{$task['repoUrl']}'>";
+                echo "<input type='hidden' name='branches' value='{$task['branches']}'>";
+                echo "<input type='submit' name='done' value='Done'>";
+                echo "</form>";
+                echo "</td>";
                 echo "</tr>";
             }
         }
